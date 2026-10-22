@@ -5,6 +5,8 @@
 <a id="zh"></a>
 ## 中文
 
+0.1.0 尚未发布，以下为准备中的首次发行说明。
+
 ### 新增功能
 
 - 在插件页加入 Skill 标签页：按来源分组查看 Skill，开关模型调用与手动调用，新建、导入、编辑和删除。
@@ -16,10 +18,12 @@
 ### 其他变更
 
 - 精确适配 DSH **0.2.1-rc.2**、Cordis **4.0.5** 与 Node.js **22.19+**。
-- 使用 MIT 许可，通过固定 GitHub Release 包分发。
+- 使用 MIT 许可，计划通过固定 GitHub Release 包分发。
 
 <a id="en"></a>
 ## English
+
+Version 0.1.0 is not yet released. These notes describe the planned first release.
 
 ### New features
 
@@ -32,10 +36,14 @@
 ### Other changes
 
 - Exact compatibility with DSH **0.2.1-rc.2**, Cordis **4.0.5** and Node.js **22.19+**.
-- MIT licensed, distributed through pinned GitHub Release packages.
+- MIT licensed, with pinned GitHub Release packages planned.
 
 <a id="installation"></a>
 ## 安装 / Installation
+
+**待发布：固定安装包与 SHA256SUMS 在正式发行后生效；当前请按安装指南从源码构建。**
+
+**Pending release: the pinned package and SHA256SUMS become available after publication. For now, build from source using the installation guide.**
 
 **宿主 / Host:** DSH `0.2.1-rc.2` · **Cordis:** `4.0.5` · **Node.js:** `>=22.19`
 

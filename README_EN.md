@@ -7,7 +7,7 @@
 <p align="center"><a href="README.md">简体中文</a> · <strong>English</strong></p>
 
 <p align="center">
-  <a href="https://github.com/gulagala001/dsh-extensions/releases/tag/v0.1.0-dsh.0.2.1-rc.2"><img alt="0.1.0" src="https://img.shields.io/badge/release-0.1.0-0969da?style=flat-square"></a>
+  <a href="https://github.com/gulagala001/dsh-extensions/releases/tag/v0.1.0-dsh.0.2.1-rc.2"><img alt="0.1.0 pending" src="https://img.shields.io/badge/release-0.1.0_pending-777777?style=flat-square"></a>
   <a href="#install"><img alt="DSH 0.2.1-rc.2" src="https://img.shields.io/badge/DSH-0.2.1--rc.2-0969da?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square"></a>
 </p>
@@ -23,6 +23,8 @@ DSH already reads skills, MCP servers, AGENTS.md and similar extensions, but mos
 **Requirements:** DSH **0.2.1-rc.2**, Node.js **22.19+**.
 
 ### 1. Install
+
+**Not yet released.** The URLs below are reserved for the first release. Until then, [build a local package from source](docs/install_EN.md#build-from-source).
 
 In the DSH instance you use, open **Plugins → + Add plugin** and paste:
 
