@@ -6,7 +6,6 @@
 
 ## Install into the current instance
 
-**Pending release:** the fixed package and SHA256SUMS below are not available yet. Use a local source build until the release is published.
 
 In the instance you use, open **Plugins → + Add plugin** and paste the pinned release URL:
 

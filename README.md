@@ -7,7 +7,7 @@
 <p align="center"><strong>简体中文</strong> · <a href="README_EN.md">English</a></p>
 
 <p align="center">
-  <a href="https://github.com/gulagala001/dsh-extensions/releases/tag/v0.1.0-dsh.0.2.1-rc.2"><img alt="0.1.0 pending" src="https://img.shields.io/badge/release-0.1.0_pending-777777?style=flat-square"></a>
+  <a href="https://github.com/gulagala001/dsh-extensions/releases/tag/v0.1.0-dsh.0.2.1-rc.2"><img alt="0.1.0" src="https://img.shields.io/badge/release-0.1.0-0969da?style=flat-square"></a>
   <a href="#readme-install"><img alt="DSH 0.2.1-rc.2" src="https://img.shields.io/badge/DSH-0.2.1--rc.2-0969da?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square"></a>
 </p>
@@ -24,7 +24,6 @@ DSH 已经能读取 Skill、MCP 服务器、AGENTS.md 等扩展，但大多只�
 
 ### 1. 安装
 
-**尚未发布。** 以下地址预留给首次发行；目前请[从源码构建本地安装包](docs/install.md#build-from-source)。
 
 打开实际使用的 DSH 实例，在 **插件 → ＋ 添加插件** 中粘贴：
 
