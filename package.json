@@ -26,6 +26,7 @@
     "scripts"
   ],
   "scripts": {
+    "test": "node --test test/*.test.mjs",
     "build": "node scripts/build.mjs",
     "check:public": "node scripts/check-public-files.mjs",
     "prepack": "node scripts/check-docs.mjs && node scripts/prepack.mjs",
