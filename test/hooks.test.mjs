@@ -68,6 +68,24 @@ async function runningHook(t, hooks, directory, signal) {
   return { outcome, pid };
 }
 
+async function assertStopped(pid) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try { process.kill(pid, 0); }
+    catch (error) { assert.equal(error.code, 'ESRCH'); return; }
+    // Linux may retain a killed grandchild as a zombie until its new parent
+    // reaps it. It cannot execute; kill(pid, 0) alone still reports it present.
+    if (process.platform === 'linux') {
+      const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (stat === null || /^\d+ \(.*\) Z /.test(stat)) return;
+    }
+    await delay(10);
+  }
+  assert.fail('The hook process is still running after cancellation');
+}
+
 test('unloading Hooks aborts and drains a running shell command', { skip: process.platform === 'win32' }, async t => {
   const { hooks, ctx, directory } = await fixture(t);
   hooks.start();
@@ -75,7 +93,7 @@ test('unloading Hooks aborts and drains a running shell command', { skip: proces
   await ctx.fiber.dispose();
   const result = await Promise.race([outcome, delay(500, null)]);
   assert.match(result?.error?.message ?? '', /stopped/);
-  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+  await assertStopped(pid);
 });
 
 test('a disconnected test request cancels its command and a later run still works', { skip: process.platform === 'win32' }, async t => {
@@ -84,7 +102,7 @@ test('a disconnected test request cancels its command and a later run still work
   controller.abort(new Error('request disconnected'));
   const result = await Promise.race([outcome, delay(500, null)]);
   assert.match(result?.error?.message ?? '', /disconnected/);
-  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+  await assertStopped(pid);
   const next = await hooks.test({ event: 'Stop', command: 'echo resumed', timeout: 1 });
   assert.equal(next.code, 0);
   assert.equal(next.stdout.trim(), 'resumed');
