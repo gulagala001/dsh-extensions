@@ -76,7 +76,7 @@ async function assertStopped(pid) {
     // reaps it. It cannot execute; kill(pid, 0) alone still reports it present.
     if (process.platform === 'linux') {
       const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(error => {
-        if (error.code === 'ENOENT') return null;
+        if (error.code === 'ENOENT' || error.code === 'ESRCH') return null;
         throw error;
       });
       if (stat === null || /^\d+ \(.*\) Z /.test(stat)) return;
