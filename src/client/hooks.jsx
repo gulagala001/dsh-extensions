@@ -67,7 +67,7 @@ export function HooksPage() {
 
 function HookEditor({ editor, data, onClose, onSaved }) {
   const t = useT(), action = useAction(), test = useAction();
-  const [draft, setDraft] = useState(editor), [result, setResult] = useState(null);
+  const [draft, setDraft] = useState(editor), [result, setResult] = useState(null), [sessionId, setSessionId] = useState('');
   const testing = useRef(null);
   useEffect(() => () => testing.current?.abort(), []);
   const set = key => event => setDraft(current => ({ ...current, [key]: event.target.value }));
@@ -84,7 +84,7 @@ function HookEditor({ editor, data, onClose, onSaved }) {
     setResult(null);
     try {
       const response = await test.run(async () => {
-        try { return await api('/hooks', { action: 'test', event: draft.event, command: draft.command, timeout: timeout() }, controller.signal); }
+        try { return await api('/hooks', { action: 'test', event: draft.event, command: draft.command, timeout: timeout(), sessionId }, controller.signal); }
         catch (error) { if (!controller.signal.aborted) throw error; }
       });
       if (response && !controller.signal.aborted) setResult(response.run);
@@ -99,9 +99,11 @@ function HookEditor({ editor, data, onClose, onSaved }) {
     </div>
     <p className="dshx-hint">{t(`hooks.eventHint.${draft.event}`)}</p>
     <Field label={t('hooks.command')} hint={t('hooks.command.hint')}><TextArea rows={4} value={draft.command} onChange={set('command')} placeholder="~/.dsh/hooks/check.sh" data-modal-autofocus/></Field>
-    <Field label={t('hooks.timeout')} hint={t('hooks.timeout.hint')}><Input value={draft.timeout} onChange={set('timeout')} inputMode="numeric" placeholder="60"/></Field>
+    <Field label={t('hooks.timeout')} hint={t('hooks.timeout.hint')}><Input value={draft.timeout} onChange={set('timeout')} inputMode="numeric" placeholder="600"/></Field>
     <div className="dshx-test">
-      <Button type="button" variant="outline" size="sm" icon={<IconPlayOutlineRegular size={13}/>} disabled={test.busy || !draft.command.trim()} onClick={run}>{test.busy ? t('hooks.testing') : t('hooks.test')}</Button>
+      <Field label={t('hooks.test.session')}><Select label={t('hooks.test.session')} value={sessionId} onChange={setSessionId}
+        options={[{ value: '', label: t('hooks.test.chooseSession') }, ...(data.sessions ?? []).map(session => ({ value: session.id, label: session.label }))]}/></Field>
+      <Button type="button" variant="outline" size="sm" icon={<IconPlayOutlineRegular size={13}/>} disabled={test.busy || !draft.command.trim() || !sessionId} onClick={run}>{test.busy ? t('hooks.testing') : t('hooks.test')}</Button>
       {test.busy && <Button type="button" variant="outline" size="sm" onClick={() => testing.current?.abort()}>{t('cancel')}</Button>}
       {test.error && <span className="dshx-error-text">{errorMessage(t, test.error)}</span>}
       {result && <span className="dshx-muted">{result.timedOut ? t('hooks.test.timeout') : result.error ? result.error : t('hooks.test.result', { code: result.code, ms: result.durationMs })}
