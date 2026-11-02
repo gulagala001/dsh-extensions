@@ -1,6 +1,7 @@
 import { posix, win32 } from 'node:path';
 import { runHook, mergeHookOutputs } from '@deepseek-ai/dsh-hook-protocol';
 import { approveEscalation } from '@deepseek-ai/dsh-sandbox';
+import { transcript as projectTranscript } from './hook-transcript.mjs';
 
 export { mergeHookOutputs };
 export const TOOL_ALIASES = Object.freeze({ bash: 'Bash', pwsh: 'PowerShell', read: 'Read', edit: 'Edit', write: 'Write',
@@ -9,13 +10,15 @@ export const TOOL_ALIASES = Object.freeze({ bash: 'Bash', pwsh: 'PowerShell', re
   create_worktree: 'EnterWorktree', worktree: 'EnterWorktree', skill: 'Skill' });
 const absent = error => ['FS_NOT_FOUND', 'ENOENT', 'ENOTDIR'].includes(error?.code);
 const aliases = name => Object.hasOwn(TOOL_ALIASES, name) ? TOOL_ALIASES[name] : name;
-const paths = context => context.executorId ? posix : process.platform === 'win32' ? win32 : posix;
+const actualWindows = context => context.executionPlatform === 'win32' || context.executionKind === 'local-pilot' || (!context.executorId && process.platform === 'win32');
+const paths = context => actualWindows(context) ? win32 : posix;
 
-export async function hookSources(ctx, agent, signal, legacyFile) {
-  const context = await ctx.platformProjectConfig.resolve(agent, signal);
+export async function hookSources(ctx, agent, signal, legacyFile, {actorMode='execution'}={}) {
+  const context = await ctx.platformProjectConfig.resolve(agent, signal, {actorMode});
   const path = paths(context);
   const files = [];
-  if (!context.executorId && legacyFile) files.push({ file: legacyFile, projectDir: context.checkoutRoot });
+  if (context.userConfigRoot) files.push({file:path.join(context.userConfigRoot,'.dsh/hooks.json'),projectDir:context.checkoutRoot});
+  else if (!context.executorId && legacyFile) files.push({ file: legacyFile, projectDir: context.checkoutRoot });
   if (context.userConfigRoot) files.push({ file: path.join(context.userConfigRoot, '.claude/settings.json'), projectDir: context.checkoutRoot });
   files.push({ file: path.join(context.checkoutRoot, '.claude/settings.json'), projectDir: context.checkoutRoot },
     { file: path.join(context.sourceRoot, '.claude/settings.local.json'), projectDir: context.sourceRoot });
@@ -68,23 +71,28 @@ export function selectedHooks(documents, event, value, matches) {
 // Execute argv only through the selected realm's native process/sandbox seams.
 // An explicit command invocation never falls back to node:child_process on Host.
 async function argvResult(context, spec, hook, policy) {
-  const localWindows = !context.executorId && process.platform === 'win32';
+  const localWindows = actualWindows(context);
   let argv;
   if (hook.args !== undefined) {
     if (!Array.isArray(hook.args) || hook.args.some(value => typeof value !== 'string')) throw new Error('Hook args must be strings');
     argv = [await context.subprocess.resolveExecutable(hook.command, spec.env, spec.signal), ...hook.args];
   } else if (hook.shell === 'powershell') {
-    argv = [await context.subprocess.resolveExecutable('pwsh', spec.env, spec.signal), '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', spec.command];
+    argv = [await context.subprocess.resolveExecutable(context.hookShells?.powershell ?? 'pwsh', spec.env, spec.signal), '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', spec.command];
   } else if (localWindows) {
     // Never resolve Windows' WSL bash shim as Git Bash. An explicit Claude path
     // or the standard native Git installation must exist in this local realm.
-    const candidates = [process.env.CLAUDE_CODE_GIT_BASH_PATH,
+    const explicit=context.hookShells?.bash ?? spec.env?.CLAUDE_CODE_GIT_BASH_PATH ?? process.env.CLAUDE_CODE_GIT_BASH_PATH;
+    const candidates = [explicit,
       process.env.ProgramFiles && win32.join(process.env.ProgramFiles, 'Git/bin/bash.exe'),
       process.env.LOCALAPPDATA && win32.join(process.env.LOCALAPPDATA, 'Programs/Git/bin/bash.exe')].filter(Boolean);
     let bash;
     for (const candidate of candidates) {
-      const target = await context.fs.resolve(candidate, { signal: spec.signal });
-      if ((await context.fs.stat(target, spec.signal))?.type === 'file') { bash = context.fs.processPath(target); break; }
+      if(process.env.SystemRoot && ['System32','Sysnative'].some(folder=>win32.normalize(candidate).toLowerCase()===win32.join(process.env.SystemRoot,folder,'bash.exe').toLowerCase()))throw new Error('The WSL Bash launcher is not a Git Bash hook executor');
+      try {
+        const target = await context.fs.resolve(candidate, { signal: spec.signal });
+        if ((await context.fs.stat(target, spec.signal))?.type === 'file') { bash = context.fs.processPath(target); break; }
+      } catch (error) { if (!absent(error)) throw error; }
+      if(candidate===explicit)throw new Error('The configured Git Bash hook executable is unavailable');
     }
     if (!bash) throw new Error('Git Bash is required by this Claude hook; configure CLAUDE_CODE_GIT_BASH_PATH');
     argv = [bash, '-c', spec.command];
@@ -103,7 +111,9 @@ async function argvResult(context, spec, hook, policy) {
 
 export async function executeHook(ctx, agent, context, hook, input, { signal, event, callId, allowApproval = true }) {
   const access = ctx.get('platformAccess');
-  if (access) access.assertContext(access.resolveExecution(agent), 'write');
+  const actor=access ? hook.executionActor ?? access.resolveExecution(agent) : undefined;
+  if (access) access.assertContext(actor, 'write');
+  const operation=async()=>{
   const projectDir = hook.projectDir ?? context.checkoutRoot;
   const substitute = value => value.replaceAll('${CLAUDE_PROJECT_DIR}', projectDir)
     .replaceAll('${CLAUDE_PLUGIN_ROOT}', hook.pluginRoot ?? '${CLAUDE_PLUGIN_ROOT}');
@@ -124,7 +134,7 @@ export async function executeHook(ctx, agent, context, hook, input, { signal, ev
   let result = await run();
   // This signature proves MSYS failed before the requested program started.
   // Escalation is a native, one-invocation question, never a persistent grant.
-  const msysFailure = !context.executorId && process.platform === 'win32' && raw?.exitCode !== 0
+  const msysFailure = actualWindows(context) && raw?.exitCode !== 0
     && /couldn't create (?:signal )?pipe[^\n]*(?:Win32 error 5|Access is denied)/i.test(raw?.stderr?.text ?? '');
   if (msysFailure && standing.mode !== 'danger-full-access') {
     if (!allowApproval) throw new Error(`${event} hook could not start under Windows confinement; no approval is available outside an open turn`);
@@ -138,27 +148,10 @@ export async function executeHook(ctx, agent, context, hook, input, { signal, ev
   // A failed spawn/timeout must not masquerade as a successfully checked gate.
   if (result.output.exitCode === undefined || raw?.timedOut || raw?.aborted) throw new Error(result.output.stderr || `${event} hook did not complete`);
   return { ...raw, code: raw.exitCode, stdout: raw.stdout.text, stderr: raw.stderr.text, output: result.output, durationMs: result.durationMs };
+  };
+  return access ? access.runAsContext(actor,operation) : operation();
 }
 
 export async function transcript(ctx, agent, signal) {
-  const messages = agent.session.deriveMessages();
-  const blocks = content => content.flatMap(block => {
-    if (block.type === 'tool-call') {
-      let input;
-      try { input = JSON.parse(block.arguments); } catch { input = { raw: block.arguments }; }
-      return [{ type: 'tool_use', id: block.id, name: aliases(block.name), input }];
-    }
-    if (block.type === 'reasoning') return [{ type: 'thinking', thinking: block.text ?? '' }];
-    if (block.type === 'text' || block.type === 'image') return [block];
-    return [{ type: 'text', text: `[native ${block.type}] ${JSON.stringify(block)}` }];
-  });
-  const rows = messages.map((message, index) => ({ type: message.role === 'assistant' ? 'assistant' : 'user',
-    uuid: String(message.id), sessionId: agent.session.id, native_role: message.role,
-    parentUuid: index ? String(messages[index - 1].id) : null,
-    message: { role: message.role === 'assistant' ? 'assistant' : 'user', content: message.role === 'tool'
-      ? [{ type: 'tool_result', tool_use_id: message.toolCallId, is_error: message.isError === true, content: blocks(message.content) }]
-      : blocks(message.content) } }));
-  const path = await ctx.platformProjectConfig.writeState(agent, 'transcript.jsonl', rows.map(row => JSON.stringify(row)).join('\n') + '\n', signal);
-  const last = [...messages].reverse().find(message => message.role === 'assistant');
-  return { transcript_path: path, last_assistant_message: (last?.content ?? []).filter(block => block.type === 'text').map(block => block.text).join('\n') };
+  return projectTranscript(ctx, agent, signal, { toolName: aliases });
 }

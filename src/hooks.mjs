@@ -85,7 +85,8 @@ export class Hooks {
     this.documents.set(agent, loaded.documents);
     const scoped = [...(this.skills.get(agent)?.values() ?? [])].map(skill => ({ file: skill.source, pluginRoot: skill.pluginRoot, projectDir: skill.projectDir ?? loaded.context.checkoutRoot, document: { hooks: skill.hooks } }));
     const consumed = this.once.get(agent);
-    return selectedHooks([...loaded.documents, ...scoped], event, value, matches).filter(hook => !hook.once || !consumed?.has(JSON.stringify([event, hook.source, hook.command, hook.args])));
+    const executionActor=this.ctx.get('platformAccess')?.resolveExecution(agent);
+    return selectedHooks([...loaded.documents, ...scoped], event, value, matches).filter(hook => !hook.once || !consumed?.has(JSON.stringify([event, hook.source, hook.command, hook.args]))).map(hook=>({...hook,executionContext:loaded.context,executionActor}));
   }
   registerSkill(agent, definition) {
     if (!agent || typeof definition?.id !== 'string' || !definition.hooks || typeof definition.source !== 'string') throw new Error('Invalid skill-scoped hook registration');
@@ -110,7 +111,7 @@ export class Hooks {
     await Promise.allSettled([...this.running, this.queue]);
   }
   async run(event, hooks, fields, { agent, signal = this.controller.signal } = {}) {
-    const context = this.contexts.get(agent);
+    const context = hooks[0]?.executionContext ?? this.contexts.get(agent);
     if (!context) throw new Error('Session hook execution context is unavailable');
     const projection = event === 'SessionEnd' ? this.projections.get(agent) ?? {} : await transcript(this.ctx, agent, signal);
     this.projections.set(agent, projection);
@@ -220,12 +221,9 @@ export class Hooks {
       return context ? { ...decision, messages: [...decision.messages, contextMessage('UserPromptSubmit', context)] } : decision;
       };
       const access = this.ctx.get('platformAccess');
-      const principal = payload.messages.find(message => message.source?.kind === 'user' && message.source.principal?.kind === 'platform-human')?.source.principal;
-      // Native channel admission supplied this source; model text and hook
-      // output cannot construct it. This also covers the first, unlogged batch.
-      return access && principal
-        ? access.runAsContext(access.requireSession(principal, payload.agent.id, 'write'), proceed)
-        : proceed();
+      // Native admission resolves the last actual claimed human message and
+      // keeps the actor through the whole first, not-yet-durable step.
+      return access ? access.runAsAdmittedStep(payload.agent, payload.messages, proceed) : proceed();
     });
     this.ctx.on('agent/created', async ({ agent, source }) => {
       this.starts.set(agent, source);
@@ -333,8 +331,7 @@ export class Hooks {
     Hooks.validate({ event, command, timeout });
     const agent = this.ctx.get('agents')?.get(sessionId);
     if (!agent) throw new Error('Choose an actual session for the hook try-run');
-    const loaded = await hookSources(this.ctx, agent, signal, this.file);
-    this.contexts.set(agent, loaded.context);
+    const loaded = await hookSources(this.ctx, agent, signal, this.file, {actorMode:'view'});
     const projection = await transcript(this.ctx, agent, signal);
     const input = { session_id: agent.session.id, cwd: loaded.context.cwd, hook_event_name: event,
       agent_type: subagent(agent) ? 'general-purpose' : 'main', ...projection,
@@ -342,7 +339,7 @@ export class Hooks {
         : event === 'UserPromptSubmit' ? { prompt: 'Hook try-run' } : { tool_name: 'Read', tool_input: {}, tool_use_id: 'hook-try-run' }) };
     // Try-run is outside the model turn: it never answers an approval, injects
     // model work, or manufactures turn-enclosed hook journal events.
-    const run = await this.execute(command, input, { agent, event, hook: { type: 'command', command, timeout }, signal, allowApproval: false });
+    const run = await this.execute(command, input, { agent, event, hook: { type: 'command', command, timeout }, signal, allowApproval: false, context:loaded.context });
     return { ...run, stdout: trimTo(run.stdout, 4000), stderr: trimTo(run.stderr, 4000), result: interpret(event, run) };
   }
 }
