@@ -2,7 +2,7 @@ import { Context } from '@deepseek-ai/cordis';
 import { Extensions, VERSION } from './service.mjs';
 
 export const name = 'dsh-extensions';
-export const inject = ['webServer', 'connection', 'loader', 'platformProjectConfig'];
+export const inject = ['webServer', 'connection', 'loader', 'platformProjectConfig', 'sessionProjections'];
 export { VERSION };
 
 const ownership = Symbol.for('dsh.extensions.backend');
