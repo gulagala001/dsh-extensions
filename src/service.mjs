@@ -52,6 +52,12 @@ export class Extensions extends Service {
     return { id: found.id, title: found.title, cwd: found.path };
   }
   async handle(req, res) {
+    const access=this.ctx.get('platformAccess');
+    let principal;
+    if(access) {
+      try { principal=access.authenticateHttp(req).principal;if(!access.isGlobalAdmin(principal))throw new Error('Extensions administration requires globalAdmin'); }
+      catch {res.writeHead(403);res.end('forbidden');return;}
+    }
     const denied = this.ctx.connection.requestRejection(req);
     if (denied !== undefined) { res.writeHead(denied); res.end(); return; }
     const url = new URL(req.url, 'http://localhost');
@@ -63,8 +69,13 @@ export class Extensions extends Service {
       if (!this.enabled) fail('service-missing', 'Extensions service is stopped', {}, 503);
       if (req.method === 'GET') send(res, 200, await this.read(route, url.searchParams, controller.signal));
       // JSON may encode one content byte as six bytes (for example \\u0000).
-      else if (req.method === 'POST') send(res, 200, await this.write(route, await body(req,
-        route === '/instructions' ? MAX_INSTRUCTION_BYTES * 6 + 65536 : MAX_BODY), controller.signal));
+      else if (req.method === 'POST') {
+        const input=await body(req,route === '/instructions' ? MAX_INSTRUCTION_BYTES * 6 + 65536 : MAX_BODY);
+        const operation=()=>this.write(route,input,controller.signal);
+        const result=access && route==='/hooks' && input.action==='test'
+          ? await access.runAsContext(access.requireSession(principal,input.sessionId,'write'),operation) : await operation();
+        send(res,200,result);
+      }
       else send(res, 405, { error: 'Method not allowed', code: 'method' });
     } catch (error) {
       const known = error instanceof ExtensionError || error?.code === 'invalid-frontmatter';

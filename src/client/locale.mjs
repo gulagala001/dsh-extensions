@@ -1,6 +1,12 @@
 export const NS = 'dshExtensions';
 
 export const zh = {
+  "hooks.test.session": "试运行会话",
+  "hooks.test.chooseSession": "选择会话",
+  "hooks.event.SubagentStart": "子代理启动",
+  "hooks.event.SubagentStop": "子代理停止",
+  "hooks.eventHint.SubagentStart": "子代理首次请求模型之前运行。",
+  "hooks.eventHint.SubagentStop": "子代理即将结束本轮时运行。",
   'tab.skills': 'Skill', 'tab.mcp': 'MCP', 'tab.instructions': '指令', 'tab.commands': '命令', 'tab.hooks': 'Hooks',
   'scope.global': '全局', 'scope.label': '查看范围', 'scope.workspaces': '工作区',
   search: '搜索', refresh: '刷新', more: '更多操作', back: '返回', close: '关闭', cancel: '取消', save: '保存', saving: '正在保存…',
@@ -68,7 +74,7 @@ export const zh = {
   'hooks.eventHint.UserPromptSubmit': '消息发送给模型前运行；退出码 2 拦截这条消息，标准输出作为补充上下文。',
   'hooks.eventHint.PreToolUse': '工具执行前运行；退出码 2 拒绝本次调用，标准错误作为原因告诉模型。',
   'hooks.eventHint.PostToolUse': '工具执行后运行；退出码 2 时把标准错误作为反馈交给模型。',
-  'hooks.eventHint.Stop': '模型准备结束回合时运行；退出码 2 让模型按标准错误继续工作，每回合最多 3 次。',
+  'hooks.eventHint.Stop': '模型准备结束回合时运行；退出码 2 让模型按标准错误继续工作，用户取消仍然有效。',
   'hooks.eventHint.SessionEnd': '会话关闭时运行，不影响会话。',
   'hooks.matcher': '匹配', 'hooks.matcher.tool': '工具名，支持 a|b 或正则；留空匹配全部工具', 'hooks.matcher.source': 'startup、resume、clear 或 compact；留空匹配全部',
   'hooks.command': '命令', 'hooks.command.hint': '通过系统 shell 运行；事件数据以 JSON 写入标准输入，工作目录为会话目录。',
@@ -103,6 +109,12 @@ export const zh = {
 };
 
 export const en = {
+  "hooks.test.session": "Try-run in session",
+  "hooks.test.chooseSession": "Choose a session",
+  "hooks.event.SubagentStart": "Subagent start",
+  "hooks.event.SubagentStop": "Subagent stop",
+  "hooks.eventHint.SubagentStart": "Runs before the subagent first requests the model.",
+  "hooks.eventHint.SubagentStop": "Runs when the subagent is about to finish its turn.",
   'tab.skills': 'Skills', 'tab.mcp': 'MCP', 'tab.instructions': 'Instructions', 'tab.commands': 'Commands', 'tab.hooks': 'Hooks',
   'scope.global': 'Global', 'scope.label': 'Scope', 'scope.workspaces': 'Workspaces',
   search: 'Search', refresh: 'Refresh', more: 'More actions', back: 'Back', close: 'Close', cancel: 'Cancel', save: 'Save', saving: 'Saving…',
@@ -170,11 +182,11 @@ export const en = {
   'hooks.eventHint.UserPromptSubmit': 'Runs before a message reaches the model; exit code 2 blocks it and standard output is added as context.',
   'hooks.eventHint.PreToolUse': 'Runs before a tool executes; exit code 2 denies the call and standard error tells the model why.',
   'hooks.eventHint.PostToolUse': 'Runs after a tool executes; with exit code 2, standard error is given to the model as feedback.',
-  'hooks.eventHint.Stop': 'Runs when the model is about to finish its turn; exit code 2 makes it continue with standard error, up to 3 times per turn.',
+  'hooks.eventHint.Stop': 'Runs when the model is about to finish its turn; exit code 2 makes it continue with standard error, until its condition passes or the user cancels.',
   'hooks.eventHint.SessionEnd': 'Runs when a session closes and does not affect it.',
   'hooks.matcher': 'Matcher', 'hooks.matcher.tool': 'Tool name, a|b or a regular expression; empty matches every tool', 'hooks.matcher.source': 'startup, resume, clear or compact; empty matches all',
-  'hooks.command': 'Command', 'hooks.command.hint': 'Runs in the system shell with the event as JSON on standard input, in the session directory.',
-  'hooks.timeout': 'Timeout (seconds)', 'hooks.timeout.hint': 'Defaults to 60 seconds', 'hooks.allTools': 'All tools', 'hooks.allSources': 'All sources',
+  'hooks.command': 'Command', 'hooks.command.hint': 'Runs through the session executor and sandbox with event JSON on standard input.',
+  'hooks.timeout': 'Timeout (seconds)', 'hooks.timeout.hint': 'Defaults to 600 seconds', 'hooks.allTools': 'All tools', 'hooks.allSources': 'All sources',
   'hooks.test': 'Test run', 'hooks.testing': 'Running…', 'hooks.test.result': 'Exit code {code} · {ms} ms', 'hooks.test.timeout': 'Timed out',
   'hooks.stdout': 'Standard output', 'hooks.stderr': 'Standard error',
   'hooks.runs': 'Recent runs', 'hooks.runs.empty': 'No runs yet.',
