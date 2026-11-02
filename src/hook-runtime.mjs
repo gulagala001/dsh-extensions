@@ -6,22 +6,26 @@ export { mergeHookOutputs };
 export const TOOL_ALIASES = Object.freeze({ bash: 'Bash', pwsh: 'PowerShell', read: 'Read', edit: 'Edit', write: 'Write',
   glob: 'Glob', grep: 'Grep', web_fetch: 'WebFetch', web_search: 'WebSearch', subagent: 'Task',
   todo_write: 'TodoWrite', ask_user_question: 'AskUserQuestion', enter_plan_mode: 'EnterPlanMode', exit_plan_mode: 'ExitPlanMode',
-  worktree: 'EnterWorktree', skill: 'Skill' });
+  create_worktree: 'EnterWorktree', worktree: 'EnterWorktree', skill: 'Skill' });
 const absent = error => ['FS_NOT_FOUND', 'ENOENT', 'ENOTDIR'].includes(error?.code);
-const aliases = name => TOOL_ALIASES[name] ?? name;
+const aliases = name => Object.hasOwn(TOOL_ALIASES, name) ? TOOL_ALIASES[name] : name;
 const paths = context => context.executorId ? posix : process.platform === 'win32' ? win32 : posix;
 
 export async function hookSources(ctx, agent, signal, legacyFile) {
   const context = await ctx.platformProjectConfig.resolve(agent, signal);
   const path = paths(context);
   const files = [];
-  if (!context.executorId && legacyFile) files.push(legacyFile);
-  if (context.userConfigRoot) files.push(path.join(context.userConfigRoot, '.claude/settings.json'));
-  files.push(path.join(context.sourceRoot, '.claude/settings.json'), path.join(context.sourceRoot, '.claude/settings.local.json'));
+  if (!context.executorId && legacyFile) files.push({ file: legacyFile, projectDir: context.checkoutRoot });
+  if (context.userConfigRoot) files.push({ file: path.join(context.userConfigRoot, '.claude/settings.json'), projectDir: context.checkoutRoot });
+  files.push({ file: path.join(context.sourceRoot, '.claude/settings.json'), projectDir: context.sourceRoot },
+    { file: path.join(context.sourceRoot, '.claude/settings.local.json'), projectDir: context.sourceRoot });
   // The pre-existing DSH file remains a source on an unbound local installation;
   // a remote project never reaches back into the control host's filesystem.
   const documents = [];
-  for (const file of [...new Set(files)]) {
+  const seenFiles = new Set();
+  for (const { file, projectDir } of files) {
+    if (seenFiles.has(file)) continue;
+    seenFiles.add(file);
     try {
       const target = await context.fs.resolve(file, { cwd: context.sourceRoot, signal });
       const stat = await context.fs.stat(target, signal);
@@ -29,7 +33,8 @@ export async function hookSources(ctx, agent, signal, legacyFile) {
       if (stat.type !== 'file') throw new Error(`Hook settings are not a regular file: ${file}`);
       const value = JSON.parse(await context.fs.readText(target, signal));
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid hook settings: ${file}`);
-      documents.push({ file: context.fs.processPath(target), document: value });
+      if (value.hooks !== undefined && (!value.hooks || typeof value.hooks !== 'object' || Array.isArray(value.hooks))) throw new Error(`Invalid hooks object: ${file}`);
+      documents.push({ file: context.fs.processPath(target), projectDir, document: value });
     } catch (error) { if (!absent(error)) throw error; }
   }
   const env = {};
@@ -42,17 +47,18 @@ export async function hookSources(ctx, agent, signal, legacyFile) {
 export function selectedHooks(documents, event, value, matches) {
   let disabled = false;
   const selected = new Map();
-  for (const { file, document, pluginRoot } of documents) {
+  for (const { file, document, pluginRoot, projectDir } of documents) {
     if (typeof document.disableAllHooks === 'boolean') disabled = document.disableAllHooks;
     for (const group of document.hooks?.[event] ?? []) {
       if (['SessionStart', 'PreToolUse', 'PostToolUse', 'SubagentStart', 'SubagentStop'].includes(event)
         && !matches(group.matcher, aliases(value))) continue;
       for (const hook of group.hooks ?? []) {
         if (hook.enabled === false) continue;
-        if (hook.type !== 'command') throw new Error(`Unsupported ${hook.type} hook in ${file}; it was not silently skipped`);
+        if ((hook.type ?? 'command') !== 'command') throw new Error(`Unsupported ${hook.type} hook in ${file}; it was not silently skipped`);
         if (typeof hook.command !== 'string' || !hook.command.trim()) throw new Error(`Invalid command hook in ${file}`);
         const key = JSON.stringify([hook.command, hook.args ?? null, hook.shell ?? null]);
-        selected.set(key, { ...hook, source: file, ...(pluginRoot ? { pluginRoot } : {}) });
+        if (hook.shell !== undefined && !['bash', 'powershell'].includes(hook.shell)) throw new Error(`Invalid hook shell in ${file}`);
+        selected.set(key, { ...hook, source: file, projectDir, ...(pluginRoot ? { pluginRoot } : {}) });
       }
     }
   }
@@ -98,7 +104,8 @@ async function argvResult(context, spec, hook, policy) {
 export async function executeHook(ctx, agent, context, hook, input, { signal, event, callId, allowApproval = true }) {
   const access = ctx.get('platformAccess');
   if (access) access.assertContext(access.resolveExecution(agent), 'write');
-  const substitute = value => value.replaceAll('${CLAUDE_PROJECT_DIR}', context.cwd)
+  const projectDir = hook.projectDir ?? context.checkoutRoot;
+  const substitute = value => value.replaceAll('${CLAUDE_PROJECT_DIR}', projectDir)
     .replaceAll('${CLAUDE_PLUGIN_ROOT}', hook.pluginRoot ?? '${CLAUDE_PLUGIN_ROOT}');
   const command = hook.args !== undefined ? substitute(hook.command) : hook.shell === 'powershell'
     ? hook.command.replace(/\$\{(CLAUDE_PROJECT_DIR|CLAUDE_PLUGIN_ROOT)\}/g, '${env:$1}') : hook.command;
@@ -111,7 +118,7 @@ export async function executeHook(ctx, agent, context, hook, input, { signal, ev
     async execute(spec) { return { result: async () => (raw = await argvResult(context, spec, normalized, policy)) }; },
   };
   const options = { payload: { ...input, tool_name: input.tool_name ? aliases(input.tool_name) : undefined },
-    env: { ...context.hookEnv, CLAUDE_PROJECT_DIR: context.cwd, ...(hook.pluginRoot ? { CLAUDE_PLUGIN_ROOT: hook.pluginRoot } : {}) },
+    env: { ...context.hookEnv, DSH_PROJECT_DIR: context.cwd, CLAUDE_PROJECT_DIR: projectDir, ...(hook.pluginRoot ? { CLAUDE_PLUGIN_ROOT: hook.pluginRoot } : {}) },
     cwd: context.cwd, signal, trailingNewline: true, expectedEventName: event, defaultTimeoutMs: 600000 };
   const run = () => runHook(executor, { command, ...(hook.timeout ? { timeoutSec: hook.timeout } : {}) }, options, Date.now);
   let result = await run();
@@ -123,7 +130,7 @@ export async function executeHook(ctx, agent, context, hook, input, { signal, ev
     if (!allowApproval) throw new Error(`${event} hook could not start under Windows confinement; no approval is available outside an open turn`);
     const mode = await approveEscalation({ requestedMode: 'danger-full-access', effectiveMode: standing.mode,
       subject: 'command', justification: `Run this configured ${event} hook once because Git Bash cannot initialize its IPC under the Windows restricted token: ${command}` },
-    { approver: ctx.get('approval'), agent, callId: callId ?? `hook:${event}`, toolName: `hook:${event}`, signal });
+    { approver: ctx.get('approval'), agent, callId, toolName: `hook:${event}`, signal });
     policy = { ...standing, mode };
     result = await run();
   }

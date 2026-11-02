@@ -6,8 +6,12 @@ Runtime dependency: `platformProjectConfig.resolve(agent,signal)` returns verifi
 
 Sources are user `.claude/settings.json` only under the explicit executor user configuration root, then project `.claude/settings.json`, then project `.claude/settings.local.json`. Worktree command cwd is separate from this stable source root. Local legacy DSH hooks remain an additional source only for unbound local sessions. Changes are read through the bound filesystem at the next event. Imported files are never copied over canonical Claude files.
 
+Each resolved hook captures its own origin and `projectDir`: imported project settings use the stable `sourceRoot`, skill-scoped and global/native DSH hooks use `checkoutRoot` unless their registration explicitly supplies another project directory. `CLAUDE_PROJECT_DIR` follows that captured origin; process cwd and JSON `cwd` always use the actual task directory. Async execution retains the same origin and executor context. No configuration/assets are copied into task checkouts.
+
 Command hooks support shell and argv forms, per-command timeout, async/asyncRewake, once, tool aliases, context, blocking, native ask, updatedInput, and skill invocation-scoped registration. `Hooks.registerSkill(agent,{id,source,pluginRoot,hooks})` returns its disposer. The native skill adapter owns admission and removal; the dispatcher does not register a second event pipeline.
 
 SessionStart runs at first admitted turn before its model request. Stop uses actual `stop_hook_active`, carries feedback, and has no arbitrary three-continuation cutoff; cancellation still terminates work. SessionEnd cleanup is registered after preset setup and drains before provider teardown; it cannot request approval outside an open turn. Git Bash IPC initialization failure can request one native approval for one retry of that exact configured command. No session-wide permissions, persistent grants, Host process fallback, or additional retry loop is installed.
 
 Non-command hook types are rejected explicitly. They are not silently omitted or run through paid model calls. Actual deployment, VM provisioning, physical phone pairing and live installation changes are separate activation work.
+
+Upstream proposal: https://github.com/gulagala001/dsh-extensions/pull/1 (draft until consuming distribution CI completes).

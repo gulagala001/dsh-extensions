@@ -83,7 +83,7 @@ export class Hooks {
     const loaded = await hookSources(this.ctx, agent, signal, this.file);
     this.contexts.set(agent, loaded.context);
     this.documents.set(agent, loaded.documents);
-    const scoped = [...(this.skills.get(agent)?.values() ?? [])].map(skill => ({ file: skill.source, pluginRoot: skill.pluginRoot, document: { hooks: skill.hooks } }));
+    const scoped = [...(this.skills.get(agent)?.values() ?? [])].map(skill => ({ file: skill.source, pluginRoot: skill.pluginRoot, projectDir: skill.projectDir ?? loaded.context.checkoutRoot, document: { hooks: skill.hooks } }));
     const consumed = this.once.get(agent);
     return selectedHooks([...loaded.documents, ...scoped], event, value, matches).filter(hook => !hook.once || !consumed?.has(JSON.stringify([event, hook.source, hook.command, hook.args])));
   }
@@ -100,7 +100,7 @@ export class Hooks {
     const { agent, hook = { type: 'command', command }, event = input.hook_event_name } = options;
     if (!agent) throw new Error('Choose an actual session to run a hook');
     const signal = AbortSignal.any([options.signal ?? this.controller.signal, this.controller.signal]);
-    const context = this.contexts.get(agent) ?? (await hookSources(this.ctx, agent, signal, this.file)).context;
+    const context = options.context ?? this.contexts.get(agent) ?? (await hookSources(this.ctx, agent, signal, this.file)).context;
     const task = executeHook(this.ctx, agent, context, hook, input, { signal, event, callId: input.tool_use_id, allowApproval: options.allowApproval ?? event !== 'SessionEnd' });
     this.running.add(task);
     try { return await task; } finally { this.running.delete(task); }
@@ -127,7 +127,7 @@ export class Hooks {
       const turn = journal ? this.ctx.sessionProjections.stateOf(agent.session, 'turnBoundary').lastTurn : undefined;
       if (journal) appendHookInvoked(agent.session, { turn, point: event, dialect: 'claude-code', handlerId });
       let run;
-      try { run = await this.execute(hook.command, input, { agent, hook, event, signal: runSignal }); }
+      try { run = await this.execute(hook.command, input, { agent, hook, event, signal: runSignal, context }); }
       catch (error) {
         if (journal) appendHookResult(agent.session, { turn, point: event, handlerId,
           output: parseHookOutput(undefined, '', errorText(error)), stderrSummaryMaxChars: 1000, durationMs: 0 });
@@ -253,7 +253,7 @@ export class Hooks {
       this.lifetimes.get(agent)?.abort(new Error('Session is ending'));
       await Promise.allSettled([...(this.agentRuns.get(agent) ?? [])]);
       if (!this.contexts.has(agent)) return;
-      const scoped = [...(this.skills.get(agent)?.values() ?? [])].map(skill => ({ file: skill.source, pluginRoot: skill.pluginRoot, document: { hooks: skill.hooks } }));
+      const scoped = [...(this.skills.get(agent)?.values() ?? [])].map(skill => ({ file: skill.source, pluginRoot: skill.pluginRoot, projectDir: skill.projectDir ?? this.contexts.get(agent).checkoutRoot, document: { hooks: skill.hooks } }));
       const hooks = selectedHooks([...(this.documents.get(agent) ?? []), ...scoped], 'SessionEnd', '', matches);
       if (hooks.length) await this.run('SessionEnd', hooks, { reason: 'other' }, { agent });
     } catch (error) { this.ctx.logger?.warn?.(`SessionEnd hook was not completed: ${errorText(error)}`); }
