@@ -17,7 +17,7 @@ export async function hookSources(ctx, agent, signal, legacyFile) {
   const files = [];
   if (!context.executorId && legacyFile) files.push({ file: legacyFile, projectDir: context.checkoutRoot });
   if (context.userConfigRoot) files.push({ file: path.join(context.userConfigRoot, '.claude/settings.json'), projectDir: context.checkoutRoot });
-  files.push({ file: path.join(context.sourceRoot, '.claude/settings.json'), projectDir: context.sourceRoot },
+  files.push({ file: path.join(context.checkoutRoot, '.claude/settings.json'), projectDir: context.checkoutRoot },
     { file: path.join(context.sourceRoot, '.claude/settings.local.json'), projectDir: context.sourceRoot });
   // The pre-existing DSH file remains a source on an unbound local installation;
   // a remote project never reaches back into the control host's filesystem.
