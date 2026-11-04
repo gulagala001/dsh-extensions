@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/gulagala001/dsh-extensions/releases/tag/v0.1.4-dsh.0.2.2-rc.1"><img alt="0.1.1" src="https://img.shields.io/badge/release-0.1.4-0969da?style=flat-square"></a>
-  <a href="#install"><img alt="DSH 0.2.1-rc.5" src="https://img.shields.io/badge/DSH-0.2.2--rc.1-0969da?style=flat-square"></a>
+  <a href="#install"><img alt="DSH 0.2.2-rc.1" src="https://img.shields.io/badge/DSH-0.2.2--rc.1-0969da?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square"></a>
 </p>
 
