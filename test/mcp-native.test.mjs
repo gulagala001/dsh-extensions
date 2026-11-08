@@ -16,6 +16,34 @@ const { SystemPrompt } = await import(native.resolve('@deepseek-ai/dsh-system-pr
 const { createScope } = await import(native.resolve('@deepseek-ai/dsh-scope'));
 const server = { command: process.execPath, args: [fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))] };
 
+test('a transport disconnect and native reconnect update the managed connection state', async t => {
+  const directory = await mkdtemp(join(process.env.DSHX_TEST_TMPDIR || tmpdir(), 'mcp-lifecycle-'));
+  const ctx = new Context(), pids = join(directory, 'pids');
+  const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  t.after(async () => {
+    await ctx.fiber.dispose();
+    const owned = (await readFile(pids, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).map(Number);
+    for (let tries = 0; tries < 100 && owned.some(alive); tries++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(owned.some(alive), false, 'all fixture children must exit');
+    await rm(directory, { recursive: true, force: true });
+  });
+  await ctx.plugin(SystemPrompt);
+  await ctx.plugin(ToolRuntime);
+  const mcp = new Mcp(ctx, { dsh: directory }); await mcp.start();
+  await mcp.save({ name: 'lifecycle', server: { ...server, env: { MCP_FIXTURE_PIDS: pids } } });
+  await mcp.records.get('lifecycle').ready;
+  assert.equal((await mcp.list()).servers[0].status, 'connected');
+  const pid = (await readFile(pids, 'utf8')).trim().split('\n').map(Number).findLast(alive);
+  assert.ok(pid, 'the fixture owns a live native child');
+  process.kill(pid, 'SIGTERM');
+  for (let tries = 0; tries < 100 && alive(pid); tries++) await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.notEqual((await mcp.list()).servers[0].status, 'connected', 'a lost native transport is not connected');
+  for (let tries = 0; tries < 200 && mcp.records.get('lifecycle').status !== 'connected'; tries++) await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(mcp.records.get('lifecycle').status, 'connected');
+  assert.ok((await readFile(pids, 'utf8')).trim().split('\n').length >= 2, 'native reconnect created a new generation');
+});
+
 test('native MCP tool masks restore after switches, disconnect, reload and namespace conflict', async t => {
   const directory = await mkdtemp(join(process.env.DSHX_TEST_TMPDIR || tmpdir(), 'mcp-native-'));
   const ctx = new Context(), agents = [];
@@ -79,4 +107,26 @@ test('valid server names remain data keys and malformed optional cache cannot bl
   }
   assert.deepEqual((await mcp.list()).servers.map(server => server.name).sort(), ['__proto__', 'constructor']);
   assert.deepEqual(Object.keys(JSON.parse(await readFile(mcp.file, 'utf8')).mcpServers).sort(), ['__proto__', 'constructor']);
+});
+
+test('stopping an unresponsive native startup cancels initialization and closes its children', async t => {
+  const directory = await mkdtemp(join(process.env.DSHX_TEST_TMPDIR || tmpdir(), 'mcp-startup-'));
+  const ctx = new Context(), pids = join(directory, 'pids');
+  const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  t.after(async () => {
+    await ctx.fiber.dispose();
+    const owned = (await readFile(pids, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).map(Number);
+    for (let tries = 0; tries < 100 && owned.some(alive); tries++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(owned.some(alive), false); await rm(directory, { recursive: true, force: true });
+  });
+  await ctx.plugin(SystemPrompt); await ctx.plugin(ToolRuntime);
+  const mcp = new Mcp(ctx, { dsh: directory }); await mcp.start();
+  await mcp.save({ name: 'stall', server: { ...server, env: { MCP_FIXTURE_PIDS: pids, MCP_FIXTURE_STALL: '1' } } });
+  for (let tries = 0; tries < 100; tries++) {
+    if ((await readFile(pids, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length >= 2) break;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  const before = performance.now(); await mcp.stop('stall');
+  assert.ok(performance.now() - before < 3000, 'stop must not wait for the initialization request timeout');
+  assert.equal(mcp.records.size, 0);
 });
