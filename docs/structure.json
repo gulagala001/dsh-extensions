@@ -3,7 +3,7 @@
   "published": "0.1.5-dsh.0.2.2-rc.1",
   "repository": {
     "slug": "gulagala001/dsh-extensions",
-    "description": "Manage skills, MCP servers, instructions, commands and hooks in DeepSeek Harness.",
+    "description": "在 DSH 插件页管理 Skill、MCP 服务器、指令文件、自定义命令和 Hooks。 Manage skills, MCP servers, instruction files, custom commands and hooks in DeepSeek Harness.",
     "homepage": "",
     "topics": [
       "deepseek-harness",
