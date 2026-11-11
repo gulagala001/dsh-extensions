@@ -117,3 +117,23 @@ test('native cleanup requires an actual close receipt and remains retryable afte
     assert.deepEqual(states, ['starting', 'connected']);
   } finally { client.onclose(); await observer.close(); }
 });
+
+test('cleanup can retire a failed fiber without treating its recorded start error as a new failure', async () => {
+  const {mcp,ctx}=fixture(), initial=Error('initialize failed'), server=normalizeServer('example',{command:'unused'});
+  let attempts=0;
+  ctx.plugin=()=>Object.assign(Promise.reject(initial),{
+    async dispose(){if(++attempts===1) throw Error('close failed');}, async await(){throw initial;}
+  });
+  mcp.launch(server); await mcp.records.get('example').ready;
+  assert.equal(mcp.records.get('example').status,'cleanup-failed'); assert.equal(mcp.records.get('example').startError,initial);
+  await mcp.stop('example');assert.equal(attempts,2);assert.equal(mcp.quarantines.size,0);
+});
+test('a never-started transport may close silently, but an attempted start still needs evidence', async () => {
+  for (const attempted of [false,true]) {
+    const observer=await observeNativeMcp(()=>{},{closeWaitMs:15});
+    const transport={async start(){},async close(){}},client={async close(){}};
+    await assert.rejects(observer.connect(client,transport,async()=>{if(attempted)await transport.start();throw Error('connect failed');}));
+    if(attempted){await assert.rejects(observer.close(),/not confirmed/);client.onclose();}
+    await observer.close();
+  }
+});

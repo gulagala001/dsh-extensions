@@ -86,7 +86,7 @@ async function assertStopped(pid) {
   assert.fail('The hook process is still running after cancellation');
 }
 
-test('unloading Hooks aborts and drains a running shell command', { skip: process.platform === 'win32' }, async t => {
+test('unloading Hooks aborts and drains a running shell command', async t => {
   const { hooks, ctx, directory } = await fixture(t);
   hooks.start();
   const { outcome, pid } = await runningHook(t, hooks, directory);
@@ -96,7 +96,7 @@ test('unloading Hooks aborts and drains a running shell command', { skip: proces
   await assertStopped(pid);
 });
 
-test('a disconnected test request cancels its command and a later run still works', { skip: process.platform === 'win32' }, async t => {
+test('a disconnected test request cancels its command and a later run still works', async t => {
   const { hooks, directory } = await fixture(t), controller = new AbortController();
   const { outcome, pid } = await runningHook(t, hooks, directory, controller.signal);
   controller.abort(new Error('request disconnected'));
