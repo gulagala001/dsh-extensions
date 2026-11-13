@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@deepseek-ai/cordis': link:../.local/dsh-sdk-ddac9676/vendor/cordis
-  '@deepseek-ai/dsh-llm': link:../.local/dsh-sdk-ddac9676/packages/llm/llm
-  '@deepseek-ai/dsh-mcp-client': link:../.local/dsh-sdk-ddac9676/packages/mcp/mcp-client
+  '@deepseek-ai/cordis': link:../.local/dsh-sdk-38a6a5c9/vendor/cordis
+  '@deepseek-ai/dsh-llm': link:../.local/dsh-sdk-38a6a5c9/packages/llm/llm
+  '@deepseek-ai/dsh-mcp-client': link:../.local/dsh-sdk-38a6a5c9/packages/mcp/mcp-client
   '@deepseek-ai/schemastery': 3.19.0
   '@deepseek-ai/cosmokit': 1.9.0
   '@deepseek-ai/cordis-plugin-group': 1.1.0
@@ -22,14 +22,14 @@ importers:
   .:
     dependencies:
       '@deepseek-ai/cordis':
-        specifier: link:../.local/dsh-sdk-ddac9676/vendor/cordis
-        version: link:../.local/dsh-sdk-ddac9676/vendor/cordis
+        specifier: link:../.local/dsh-sdk-38a6a5c9/vendor/cordis
+        version: link:../.local/dsh-sdk-38a6a5c9/vendor/cordis
       '@deepseek-ai/dsh-llm':
-        specifier: link:../.local/dsh-sdk-ddac9676/packages/llm/llm
-        version: link:../.local/dsh-sdk-ddac9676/packages/llm/llm
+        specifier: link:../.local/dsh-sdk-38a6a5c9/packages/llm/llm
+        version: link:../.local/dsh-sdk-38a6a5c9/packages/llm/llm
       '@deepseek-ai/dsh-mcp-client':
-        specifier: link:../.local/dsh-sdk-ddac9676/packages/mcp/mcp-client
-        version: link:../.local/dsh-sdk-ddac9676/packages/mcp/mcp-client
+        specifier: link:../.local/dsh-sdk-38a6a5c9/packages/mcp/mcp-client
+        version: link:../.local/dsh-sdk-38a6a5c9/packages/mcp/mcp-client
       yaml:
         specifier: 2.8.1
         version: 2.8.1
