@@ -141,3 +141,12 @@ test('closing the HTTP test request reaches the running Hook cancellation signal
   await request;
   assert.equal(await Promise.race([stopped.then(() => true), delay(500, false)]), true);
 });
+
+test('a stale hook editor cannot overwrite an external matcher or timeout change',async t=>{
+ const {hooks}=await fixture(t);
+ await hooks.save({event:'PreToolUse',matcher:'first',command:'echo one'});
+ const [old]=(await hooks.list()).hooks;
+ await hooks.save({id:old.id,expected:old.command,revision:old.revision,event:old.event,matcher:'second',command:old.command});
+ await assert.rejects(hooks.remove(old.id,old.command,old.revision),{code:'edit-conflict'});
+ assert.equal((await hooks.list()).hooks[0].matcher,'second');
+});
