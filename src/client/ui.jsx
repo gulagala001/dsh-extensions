@@ -30,14 +30,20 @@ export function setScope(value) {
 const subscribeScope = listener => { scopeListeners.add(listener); return () => scopeListeners.delete(listener); };
 export function useScopes() {
   const scope = useSyncExternalStore(subscribeScope, () => scopeValue);
-  const [scopes, setScopes] = useState(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    api('/state', undefined, controller.signal).then(state => setScopes(state.scopes), () => setScopes([]));
-    return () => controller.abort();
+  const catalog = useResource(async () => {
+    const { scopes } = await api('/state');
+    if (!Array.isArray(scopes)) throw new Error('Invalid workspace list');
+    return scopes;
   }, []);
-  const known = scope === 'global' || !scopes || scopes.some(item => item.id === scope);
-  return { scope: known ? scope : 'global', scopes: scopes ?? [], ready: scopes !== null };
+  const scopes = catalog.data;
+  const known = !scopes || scope === 'global' || scopes.some(item => item.id === scope);
+  return { scope: known ? scope : 'global', scopes: scopes ?? [], ready: !!scopes, error: catalog.error, reload: catalog.reload };
+}
+
+export function ScopedPage({ component: Component }) {
+  const catalog = useScopes(), t = useT();
+  if (!catalog.ready) return <Status error={catalog.error} onRetry={() => catalog.reload()} notice={t('loading')}/>;
+  return <Component key={catalog.scope} scope={catalog.scope} scopes={catalog.scopes}/>;
 }
 
 /** Load-on-mount with explicit reload; a stale response never replaces a newer one. */
