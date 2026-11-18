@@ -30,14 +30,20 @@ export function setScope(value) {
 const subscribeScope = listener => { scopeListeners.add(listener); return () => scopeListeners.delete(listener); };
 export function useScopes() {
   const scope = useSyncExternalStore(subscribeScope, () => scopeValue);
-  const catalog = useResource(async () => {
-    const { scopes } = await api('/state');
-    if (!Array.isArray(scopes)) throw new Error('Invalid workspace list');
-    return scopes;
-  }, []);
-  const scopes = catalog.data;
+  const [catalog, setCatalog] = useState({ scopes: null, error: null });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    api('/state', undefined, controller.signal).then(({ scopes }) => {
+      if (!Array.isArray(scopes)) throw new Error('Invalid workspace list');
+      if (!controller.signal.aborted) setCatalog({ scopes, error: null });
+    }).catch(error => { if (!controller.signal.aborted) setCatalog({ scopes: null, error }); });
+    return () => controller.abort();
+  }, [attempt]);
+  const { scopes, error } = catalog;
   const known = !scopes || scope === 'global' || scopes.some(item => item.id === scope);
-  return { scope: known ? scope : 'global', scopes: scopes ?? [], ready: !!scopes, error: catalog.error, reload: catalog.reload };
+  const reload = () => { setCatalog({ scopes: null, error: null }); setAttempt(value => value + 1); };
+  return { scope: known ? scope : 'global', scopes: scopes ?? [], ready: !!scopes, error, reload };
 }
 
 export function ScopedPage({ component: Component }) {
