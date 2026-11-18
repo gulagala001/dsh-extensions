@@ -1,7 +1,5 @@
 # DSH Extensions 0.1.9 · DSH 0.2.2-rc.3
 
-**未发布 / Unreleased.**
-
 [中文](#zh-019) · [English](#en-019)
 
 <a id="zh-019"></a>
