@@ -328,7 +328,7 @@ export class Mcp {
   save({ name, previous, server, revision }) {
     const normalized = normalizeServer(name, server);
     return this.edit(servers => {
-      if (previous !== undefined) checkRevision(revision, configRevision(servers[previous]));
+      if (previous !== undefined && revision !== undefined) checkRevision(revision, configRevision(servers[previous]));
       if (name !== previous && servers[name] !== undefined) fail('server-exists', `A server named ${name} already exists`, { name }, 409);
       const old = previous !== undefined && servers[previous] && typeof servers[previous] === 'object' ? servers[previous] : undefined;
       if (previous !== undefined && previous !== name) delete servers[previous];
@@ -337,7 +337,7 @@ export class Mcp {
         disabledTools: Array.isArray(old?.disabledTools) ? old.disabledTools : normalized.disabledTools });
     });
   }
-  remove(name, revision) { return this.edit(servers => { checkRevision(revision, configRevision(servers[name])); delete servers[name]; }); }
+  remove(name, revision) { return this.edit(servers => { if (revision !== undefined) checkRevision(revision, configRevision(servers[name])); delete servers[name]; }); }
   setEnabled(name, enabled) {
     return this.edit(servers => {
       if (!servers[name]) fail('server-missing', `No MCP server named ${name}`, { name }, 404);

@@ -12,7 +12,11 @@ export function configRevision(value) {
     ? Object.fromEntries(Object.keys(item).sort().map(key => [key,item[key]])) : item;
   return createHash('sha256').update(JSON.stringify(value ?? null, canonical)).digest('hex');
 }
-export function checkRevision(expected, actual) {
+export function requireRevision(expected) {
   if (typeof expected !== 'string') fail('edit-revision-required','Reload the item before changing it',{},428);
+  return expected;
+}
+export function checkRevision(expected, actual) {
+  requireRevision(expected);
   if (expected !== actual) fail('edit-conflict','The item changed elsewhere. Your draft is still open; reread it before applying changes.',{},409);
 }

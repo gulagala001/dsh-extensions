@@ -1,3 +1,4 @@
+import { requireRevision } from './edit-revision.mjs';
 import { Service } from '@deepseek-ai/cordis';
 import { ExtensionError, errorText, fail, homes } from './common.mjs';
 import { Skills } from './skills.mjs';
@@ -92,6 +93,13 @@ export class Extensions extends Service {
     if (!this.enabled) fail('service-missing', 'Extensions service is stopped', {}, 503);
     const scope = () => this.scope(input.scope);
     const done = (value = {}) => ({ ok: true, ...value });
+    // Interactive edits apply to the displayed snapshot. Direct service calls
+    // can instead express an operation on the state current at queue admission.
+    const revisionRequired = route === '/skills' && ['save','delete','invocation'].includes(input.action)
+      || route === '/instructions' && ['save','delete'].includes(input.action)
+      || ['/mcp','/commands'].includes(route) && (input.action === 'delete' || input.action === 'save' && input.previous !== undefined)
+      || route === '/hooks' && input.id !== undefined && ['save','delete','enable'].includes(input.action);
+    if (revisionRequired) requireRevision(input.revision);
     switch (`${route}#${input.action}`) {
       case '/skills#create': return done({ path: await this.skills.create(scope(), input) });
       case '/skills#import': return done({ path: await this.skills.import(scope(), input) });

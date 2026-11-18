@@ -203,6 +203,7 @@ export class Commands {
     if (name !== previous && await kind(path)) fail('command-exists', `/${name} already exists`, { name }, 409);
     this.requireOwner(owner);
     const original = previous && COMMAND_NAME.test(previous) ? join(dir, previous + '.md') : null;
+    if (original) revision ??= await fileRevision(original);
     if (previous && !original) fail('invalid-command-name','Invalid original command name');
     const guard = async () => { this.requireOwner(owner); if (original) checkRevision(revision, await fileRevision(original)); };
     await writeAtomic(path, composeFrontmatter({ description: description?.trim(), 'argument-hint': argumentHint?.trim() }, body), guard, name !== previous);
@@ -219,7 +220,7 @@ export class Commands {
     if (!COMMAND_NAME.test(name ?? '')) fail('invalid-command-name', 'Invalid command name');
     const path = join(await this.locate(scope, location), `${name}.md`);
     this.requireOwner(owner);
-    checkRevision(revision, await fileRevision(path));
+    if (revision !== undefined) checkRevision(revision, await fileRevision(path));
     await rm(path, { force: true });
     await this.afterChange(owner, scope, location);
   }); }

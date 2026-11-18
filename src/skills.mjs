@@ -152,6 +152,7 @@ export class Skills {
   }
   async replace(skill, content, revision) {
     Skills.validate(content);
+    revision ??= await fileRevision(skill.path);
     const target = await realpath(skill.path), stage = await mkdtemp(join(dirname(target), '.skill-edit-'));
     try {
       const file = join(stage, 'content');
@@ -204,14 +205,16 @@ export class Skills {
   invocation(scope, path, changes) {
     return this.mutate(async () => {
       const skill = await this.find(scope, path); this.editable(skill);
+      const revision = changes.revision ?? await fileRevision(skill.path);
       const text = await readFile(skill.path, 'utf8'), fields = {};
       if (Object.hasOwn(changes, 'model')) fields['disable-model-invocation'] = changes.model === false ? true : undefined;
       if (Object.hasOwn(changes, 'user')) fields['user-invocable'] = changes.user === false ? false : undefined;
-      await this.replace(skill, updateFrontmatter(text, fields), changes.revision);
+      await this.replace(skill, updateFrontmatter(text, fields), revision);
     });
   }
   remove(scope, path, revision) { return this.mutate(async () => {
     const skill = await this.find(scope, path); this.editable(skill);
+    revision ??= await fileRevision(skill.path);
     if (skill.bundle) {
       const directory = dirname(skill.path);
       const roots = (await this.catalog(scope)).roots.map(root => root.path);

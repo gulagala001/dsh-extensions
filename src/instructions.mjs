@@ -127,13 +127,14 @@ export class Instructions {
       const file = this.allowed(files, path);
       if (typeof content !== 'string') fail('content-required', 'Content is required');
       this.checkSize(file, Buffer.byteLength(content));
+      revision ??= file.revision;
       const target = file.exists ? await realpath(path) : path;
-      await writeAtomic(target, content, async () => { await check(); checkRevision(revision, await fileRevision(path)); }, revision === 'absent');
+      await writeAtomic(target, content, async () => { await check(); checkRevision(revision ?? file.revision, await fileRevision(path)); }, revision === 'absent');
     }, signal);
   }
   remove(scope, path, signal, revision) {
     return this.mutate(scope, async ({ files }, check) => {
-      const file = this.allowed(files, path); await check(); checkRevision(revision, await fileRevision(path));
+      const file = this.allowed(files, path); await check(); checkRevision(revision ?? file.revision, await fileRevision(path));
       if (file.exists) await rm(path);
     }, signal);
   }

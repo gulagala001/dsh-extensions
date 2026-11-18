@@ -264,7 +264,7 @@ export class Hooks {
     const [event, group, hook] = String(id).split('/');
     const entry = document.hooks[event]?.[Number(group)]?.hooks?.[Number(hook)];
     if (!entry || (expected !== undefined && entry.command !== expected)) fail('hook-changed', 'hooks.json changed meanwhile; refresh and try again', {}, 409);
-    checkRevision(revision, configRevision([event,document.hooks[event][Number(group)].matcher ?? '',entry]));
+    if (revision !== undefined) checkRevision(revision, configRevision([event,document.hooks[event][Number(group)].matcher ?? '',entry]));
     return { event, group: Number(group), hook: Number(hook), entry };
   }
   static validate({ event, matcher, command, timeout }) {
